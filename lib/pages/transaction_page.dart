@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:remussaku/database/database.dart';
 
 class TransactionPage extends StatefulWidget {
   const TransactionPage({super.key});
@@ -12,10 +14,41 @@ class TransactionPage extends StatefulWidget {
 }
 
 class _TransactionPageState extends State<TransactionPage> {
+  final AppDatabase database = AppDatabase();
   bool isExpense = true;
+  late int type;
   List<String> list = ['Makan dan jajan', 'Nonton film', 'Transportasi'];
   late String dropDownValue = list.first;
+  TextEditingController amountController = TextEditingController();
   TextEditingController dateController = TextEditingController();
+  TextEditingController descriptionController = TextEditingController();
+  Category? selectedCategory;
+
+  Future insert(
+      int amount, DateTime date, String nameDescription, int categoryId) async {
+    DateTime now = DateTime.now();
+    final row = await database.into(database.transactions).insertReturning(
+        TransactionsCompanion.insert(
+            description: nameDescription,
+            category_id: categoryId,
+            transaction_date: date,
+            amount: amount,
+            created_at: now,
+            updated_at: now));
+    print('apa' + row.toString());
+  }
+
+  Future<List<Category>> getAllCategory(int type) async {
+    return await database.getAllCategoryRepo(type);
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    type = 2;
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,6 +71,8 @@ class _TransactionPageState extends State<TransactionPage> {
                     onChanged: (bool value) {
                       setState(() {
                         isExpense = value;
+                        type = (isExpense) ? 2 : 1;
+                        selectedCategory = null;
                       });
                     },
                     inactiveTrackColor: Colors.green[200],
@@ -58,6 +93,7 @@ class _TransactionPageState extends State<TransactionPage> {
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: TextFormField(
+                  controller: amountController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                       border: UnderlineInputBorder(), labelText: 'Amount'),
@@ -75,20 +111,51 @@ class _TransactionPageState extends State<TransactionPage> {
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: DropdownButton<String>(
-                    value: dropDownValue,
-                    isExpanded: true,
-                    icon: Icon(Icons.arrow_downward),
-                    items: list.map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
+              FutureBuilder<List<Category>>(
+                  future: getAllCategory(type),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(),
                       );
-                    }).toList(),
-                    onChanged: (String? value) {}),
-              ),
+                    } else {
+                      if (snapshot.hasData) {
+                        if (snapshot.data!.length > 0) {
+                          selectedCategory = snapshot.data!.first;
+                          print('apa nih' + snapshot.toString());
+                          return Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: DropdownButton<Category>(
+                              value: (selectedCategory == null)
+                                  ? snapshot.data!.first
+                                  : selectedCategory,
+                              isExpanded: true,
+                              icon: Icon(Icons.arrow_downward),
+                              items: snapshot.data!.map((Category item) {
+                                return DropdownMenuItem<Category>(
+                                  value: item,
+                                  child: Text(item.name),
+                                );
+                              }).toList(),
+                              onChanged: (Category? value) {
+                                setState(() {
+                                  selectedCategory = value;
+                                });
+                              },
+                            ),
+                          );
+                        } else {
+                          return Center(
+                            child: Text('Data kosong'),
+                          );
+                        }
+                      } else {
+                        return Center(
+                          child: Text('Tidak ada data'),
+                        );
+                      }
+                    }
+                  }),
               SizedBox(
                 height: 25,
               ),
@@ -113,10 +180,30 @@ class _TransactionPageState extends State<TransactionPage> {
                 ),
               ),
               SizedBox(
+                height: 10,
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: TextFormField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                      border: UnderlineInputBorder(), labelText: 'Description'),
+                ),
+              ),
+              SizedBox(
                 height: 25,
               ),
               Center(
-                  child: ElevatedButton(onPressed: () {}, child: Text('Save')))
+                  child: ElevatedButton(
+                      onPressed: () {
+                        insert(
+                            int.parse(amountController.text),
+                            DateTime.parse(dateController.text),
+                            descriptionController.text,
+                            selectedCategory!.id);
+                        Navigator.pop(context, true);
+                      },
+                      child: Text('Save')))
             ],
           ),
         ),
