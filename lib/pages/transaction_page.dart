@@ -138,9 +138,7 @@ class _TransactionPageState extends State<TransactionPage> {
                                 );
                               }).toList(),
                               onChanged: (Category? value) {
-                                setState(() {
-                                  selectedCategory = value;
-                                });
+                                selectedCategory = value;
                               },
                             ),
                           );
@@ -201,7 +199,6 @@ class _TransactionPageState extends State<TransactionPage> {
                             DateTime.parse(dateController.text),
                             descriptionController.text,
                             selectedCategory!.id);
-                        Navigator.pop(context, true);
                       },
                       child: Text('Save')))
             ],
