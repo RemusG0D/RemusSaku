@@ -5,9 +5,12 @@ import 'package:flutter/widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:remussaku/database/database.dart';
+import 'package:remussaku/database/table/transaction_with_category.dart';
 
 class TransactionPage extends StatefulWidget {
-  const TransactionPage({super.key});
+  final TransactionWithCategory? transactionWithCategory;
+  const TransactionPage({Key? key, required this.transactionWithCategory})
+      : super(key: key);
 
   @override
   State<TransactionPage> createState() => _TransactionPageState();
@@ -42,11 +45,34 @@ class _TransactionPageState extends State<TransactionPage> {
     return await database.getAllCategoryRepo(type);
   }
 
+  Future update(int transactionId, int amount, int categoryId,
+      DateTime transactionDate, String nameDescription) async {
+    return await database.updateTransactionRepo(
+        transactionId, amount, categoryId, transactionDate, nameDescription);
+  }
+
   @override
   void initState() {
     // TODO: implement initState
-    type = 2;
+    if (widget.transactionWithCategory != null) {
+      updateTransactionView(widget.transactionWithCategory!);
+    } else {
+      type = 2;
+    }
+
     super.initState();
+  }
+
+  void updateTransactionView(TransactionWithCategory transactionWithCategory) {
+    amountController.text =
+        transactionWithCategory.transaction.amount.toString();
+    descriptionController.text =
+        transactionWithCategory.transaction.description;
+    dateController.text = DateFormat('yyyy-MM-dd')
+        .format(transactionWithCategory.transaction.transaction_date);
+    type = transactionWithCategory.category.type;
+    (type == 2) ? isExpense = true : isExpense = false;
+    selectedCategory = transactionWithCategory.category;
   }
 
   @override
@@ -115,30 +141,33 @@ class _TransactionPageState extends State<TransactionPage> {
                   future: getAllCategory(type),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                        child: CircularProgressIndicator(),
-                      );
+                      return CircularProgressIndicator();
                     } else {
                       if (snapshot.hasData) {
                         if (snapshot.data!.length > 0) {
-                          selectedCategory = snapshot.data!.first;
-                          print('apa nih' + snapshot.toString());
+                          selectedCategory = (selectedCategory == null)
+                              ? snapshot.data!.first
+                              : selectedCategory;
                           return Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: DropdownButton<Category>(
                               value: (selectedCategory == null)
                                   ? snapshot.data!.first
                                   : selectedCategory,
                               isExpanded: true,
-                              icon: Icon(Icons.arrow_downward),
+                              icon: const Icon(Icons.arrow_downward),
+                              elevation: 16,
                               items: snapshot.data!.map((Category item) {
                                 return DropdownMenuItem<Category>(
                                   value: item,
                                   child: Text(item.name),
                                 );
                               }).toList(),
-                              onChanged: (Category? value) {
-                                selectedCategory = value;
+                              onChanged: (Category? newValue) {
+                                print(newValue!.name);
+                                setState(() {
+                                  selectedCategory = newValue;
+                                });
                               },
                             ),
                           );
@@ -193,12 +222,21 @@ class _TransactionPageState extends State<TransactionPage> {
               ),
               Center(
                   child: ElevatedButton(
-                      onPressed: () {
-                        insert(
-                            int.parse(amountController.text),
-                            DateTime.parse(dateController.text),
-                            descriptionController.text,
-                            selectedCategory!.id);
+                      onPressed: () async {
+                        (widget.transactionWithCategory == null)
+                            ? insert(
+                                int.parse(amountController.text),
+                                DateTime.parse(dateController.text),
+                                descriptionController.text,
+                                selectedCategory!.id)
+                            : await update(
+                                widget.transactionWithCategory!.transaction.id,
+                                int.parse(amountController.text),
+                                selectedCategory!.id,
+                                DateTime.parse(dateController.text),
+                                descriptionController.text,
+                              );
+                        Navigator.pop(context, true);
                       },
                       child: Text('Save')))
             ],

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:remussaku/database/table/transaction_with_category.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:drift/drift.dart';
@@ -27,6 +28,36 @@ class AppDatabase extends _$AppDatabase {
   Future updateCategoryRepo(int id, String name) async {
     return (update(categories)..where((tbl) => tbl.id.equals(id)))
         .write(CategoriesCompanion(name: Value(name)));
+  }
+
+  Stream<List<TransactionWithCategory>> getTransactionByDateRepo(
+      DateTime date) {
+    final query = (select(transactions).join([
+      innerJoin(categories, categories.id.equalsExp(transactions.category_id))
+    ]))
+      ..where(transactions.transaction_date.equals(date));
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        return TransactionWithCategory(
+          row.readTable(transactions),
+          row.readTable(categories),
+        );
+      }).toList();
+    });
+  }
+
+  Future updateTransactionRepo(int id, int amount, int categoryId,
+      DateTime transactionDate, String nameDescription) async {
+    return (update(transactions)..where((tbl) => tbl.id.equals(id))).write(
+        TransactionsCompanion(
+            description: Value(nameDescription),
+            amount: Value(amount),
+            category_id: Value(categoryId),
+            transaction_date: Value(transactionDate)));
+  }
+
+  Future deleteTransactionRepo(int id) async {
+    return (delete(transactions)..where((tbl) => tbl.id.equals(id))).go();
   }
 }
 
